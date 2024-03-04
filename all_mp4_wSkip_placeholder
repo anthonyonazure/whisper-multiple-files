@@ -1,0 +1,60 @@
+# Define the directory containing the .mp4 files
+$directoryPath = "F:\dir"
+
+# Define the path to whisper-faster.exe
+$whisperPath = "F:\dir\whisper-faster.exe"
+
+# Define the output directory
+$outputDir = "F:\output"
+
+# Define the model directory
+$modelDir = "F:\Whisper"
+
+# Get all .mp4 files in the directory
+$mp4Files = Get-ChildItem -Path $directoryPath -Filter "*.mp4" -Recurse
+
+foreach ($file in $mp4Files) {
+    # Define the output file path and placeholder file path
+    $outputFilePath = Join-Path -Path $outputDir -ChildPath ($file.BaseName + ".txt")
+    $placeholderPath = Join-Path -Path $outputDir -ChildPath ($file.BaseName + ".processing")
+
+    # Check if the output file already exists or if a placeholder file exists
+    if (Test-Path -Path $outputFilePath) {
+        Write-Host "Skipping $($file.Name) as the output file already exists."
+        continue
+    }
+    
+    if (Test-Path -Path $placeholderPath) {
+        Write-Host "Skipping $($file.Name) as it is currently being processed."
+        continue
+    }
+
+    # Try to create a placeholder file to indicate processing is started
+    try {
+        New-Item -Path $placeholderPath -ItemType File -ErrorAction Stop
+    } catch {
+        Write-Host "Could not create placeholder for $($file.Name). It might be processed by another instance."
+        continue
+    }
+
+    # Construct the argument list for the command to execute
+    $arguments = @(
+        "--language", "en",
+        "--device", "cpu",
+        "--beam_size", "1",
+        "--compute_type", "int8",
+        "--output_format", "all",
+        "--model", "medium.en",
+        "--model_dir", $modelDir,
+        "--output_dir", $outputDir,
+        $file.FullName
+    )
+
+    # Execute the command with arguments
+    & $whisperPath $arguments
+
+    # After processing, remove the placeholder file
+    Remove-Item -Path $placeholderPath -Force
+}
+
+Write-Host "All .mp4 files have been processed."
